@@ -49,22 +49,29 @@ const Example = () => {
   const [preview, setPreview] = useState(false);
   const [designName, setDesignName] = useState('');
 
+  const ejectDesign = () => {
+    const sampleList = localStorage.getItem('savedDesign');
+    let parsedSampleList = [];
+    if (sampleList) parsedSampleList = JSON.parse(sampleList);
+
+    return parsedSampleList;
+  };
+
   const handleSaveDesign = (list, name, openAlert = true) => {
     console.log('saveDesign', name);
     openAlert &&
       alert('Design JSON has been logged in your developer console.');
-    localStorage.setItem('savedDesign', JSON.stringify(list));
+    localStorage.setItem('savedDesign', JSON.stringify(list.reverse()));
     setDesignName(name);
     modals.close();
   };
 
   const quickSave = () => {
     emailEditorRef.current?.editor?.saveDesign((design) => {
-      const sampleList = localStorage.getItem('savedDesign');
-      let parsedSampleList = [];
-      if (sampleList) parsedSampleList = JSON.parse(sampleList);
+      let parsedSampleList = ejectDesign();
       const date = new Date();
       const humanFormat = `Quick save ${date.toLocaleString()}`;
+      let name = humanFormat;
 
       const designIndex = parsedSampleList.findIndex(
         (el) => el.name === designName
@@ -72,28 +79,24 @@ const Example = () => {
 
       if (designIndex !== -1) {
         parsedSampleList[designIndex].design = design;
+        name = designName;
+      } else {
+        const payload = {
+          name: humanFormat,
+          design,
+        };
 
-        handleSaveDesign(parsedSampleList, designName, false);
-        return;
+        parsedSampleList.push(payload);
       }
 
-      const payload = {
-        name: humanFormat,
-        design,
-      };
-
-      parsedSampleList.push(payload);
-
-      handleSaveDesign(parsedSampleList, humanFormat, false);
+      handleSaveDesign(parsedSampleList, name, false);
     });
   };
 
   const saveDesign = () => {
     emailEditorRef.current?.editor?.saveDesign((design) => {
       const handleSaveName = (name) => {
-        const sampleList = localStorage.getItem('savedDesign');
-        let parsedSampleList = [];
-        if (sampleList) parsedSampleList = JSON.parse(sampleList);
+        let parsedSampleList = ejectDesign();
 
         const designIndex = parsedSampleList.findIndex(
           (el) => el.name === name
@@ -101,17 +104,14 @@ const Example = () => {
 
         if (designIndex !== -1) {
           parsedSampleList[designIndex].design = design;
+        } else {
+          const payload = {
+            name,
+            design,
+          };
 
-          handleSaveDesign(parsedSampleList, name);
-          return;
+          parsedSampleList.push(payload);
         }
-
-        const payload = {
-          name,
-          design,
-        };
-
-        parsedSampleList.push(payload);
 
         handleSaveDesign(parsedSampleList, name);
       };
@@ -170,27 +170,6 @@ const Example = () => {
   const quickSaveDesign = () => {
     quickSave();
   };
-
-  function unload() {
-    const date = new Date();
-
-    // human format example: 2020-12-08 16:57:45
-    const humanFormat = date.toLocaleString();
-    const list = localStorage.getItem('savedDesign');
-    let parsedList = [];
-    if (list) parsedList = JSON.parse(list);
-
-    emailEditorRef.current?.editor?.saveDesign((design) => {
-      const payload = {
-        name: `Autosave ${humanFormat}`,
-        design,
-      };
-
-      parsedList.push(payload);
-
-      localStorage.setItem('savedDesign', JSON.stringify(parsedList));
-    });
-  }
 
   return (
     <Container>
