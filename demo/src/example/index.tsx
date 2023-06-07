@@ -6,6 +6,8 @@ import packageJson from '../../../package.json';
 import EmailEditor from '../../../src';
 import { EditorRef } from '../../../src/types';
 import sample from './sample.json';
+import modals, { modalAction } from '../service/modal-manager';
+import '../assets/styles.scss';
 
 const Container = styled.div`
   display: flex;
@@ -20,7 +22,7 @@ const Bar = styled.div`
   color: #000;
   padding: 10px;
   display: flex;
-  max-height: 40px;
+  max-height: 70px;
 
   h1 {
     flex: 1;
@@ -45,11 +47,76 @@ const Bar = styled.div`
 const Example = () => {
   const emailEditorRef = useRef<EditorRef | null>(null);
   const [preview, setPreview] = useState(false);
+  const [designName, setDesignName] = useState('');
+
+  const handleSaveDesign = (list, name, openAlert = true) => {
+    console.log('saveDesign', name);
+    openAlert &&
+      alert('Design JSON has been logged in your developer console.');
+    localStorage.setItem('savedDesign', JSON.stringify(list));
+    setDesignName(name);
+    modals.close();
+  };
+
+  const quickSave = () => {
+    emailEditorRef.current?.editor?.saveDesign((design) => {
+      const sampleList = localStorage.getItem('savedDesign');
+      let parsedSampleList = [];
+      if (sampleList) parsedSampleList = JSON.parse(sampleList);
+      const date = new Date();
+      const humanFormat = `Quick save ${date.toLocaleString()}`;
+
+      const designIndex = parsedSampleList.findIndex(
+        (el) => el.name === designName
+      );
+
+      if (designIndex !== -1) {
+        parsedSampleList[designIndex].design = design;
+
+        handleSaveDesign(parsedSampleList, designName, false);
+        return;
+      }
+
+      const payload = {
+        name: humanFormat,
+        design,
+      };
+
+      parsedSampleList.push(payload);
+
+      handleSaveDesign(parsedSampleList, humanFormat, false);
+    });
+  };
 
   const saveDesign = () => {
     emailEditorRef.current?.editor?.saveDesign((design) => {
-      console.log('saveDesign', design);
-      alert('Design JSON has been logged in your developer console.');
+      const handleSaveName = (name) => {
+        const sampleList = localStorage.getItem('savedDesign');
+        let parsedSampleList = [];
+        if (sampleList) parsedSampleList = JSON.parse(sampleList);
+
+        const designIndex = parsedSampleList.findIndex(
+          (el) => el.name === name
+        );
+
+        if (designIndex !== -1) {
+          parsedSampleList[designIndex].design = design;
+
+          handleSaveDesign(parsedSampleList, name);
+          return;
+        }
+
+        const payload = {
+          name,
+          design,
+        };
+
+        parsedSampleList.push(payload);
+
+        handleSaveDesign(parsedSampleList, name);
+      };
+
+      modals.call(modalAction.SAVE, { cb: handleSaveName, name: designName });
     });
   };
 
@@ -59,6 +126,24 @@ const Example = () => {
       console.log('exportHtml', html);
       alert('Output HTML has been logged in your developer console.');
     });
+  };
+
+  const exportFromLocalStorage = () => {
+    const loadDesign = (design, name) => {
+      emailEditorRef.current?.editor?.loadDesign(design);
+      setDesignName(name);
+      console.log(name);
+    };
+
+    const savedDesign = localStorage.getItem('savedDesign');
+    let parsedSavedDesign = [];
+    if (savedDesign) parsedSavedDesign = JSON.parse(savedDesign);
+
+    modals.call(modalAction.LOAD, { list: parsedSavedDesign, cb: loadDesign });
+  };
+
+  const exportFromSample = () => {
+    emailEditorRef.current?.editor?.loadDesign(sample);
   };
 
   const togglePreview = () => {
@@ -75,20 +160,37 @@ const Example = () => {
     console.log('onDesignLoad', data);
   };
 
-  const onLoad = () => {
-    console.log('onLoad');
-
+  const onReady = () => {
     emailEditorRef.current?.editor?.addEventListener(
       'design:loaded',
       onDesignLoad
     );
-
-    emailEditorRef.current?.editor?.loadDesign(sample);
   };
 
-  const onReady = () => {
-    console.log('onReady');
+  const quickSaveDesign = () => {
+    quickSave();
   };
+
+  function unload() {
+    const date = new Date();
+
+    // human format example: 2020-12-08 16:57:45
+    const humanFormat = date.toLocaleString();
+    const list = localStorage.getItem('savedDesign');
+    let parsedList = [];
+    if (list) parsedList = JSON.parse(list);
+
+    emailEditorRef.current?.editor?.saveDesign((design) => {
+      const payload = {
+        name: `Autosave ${humanFormat}`,
+        design,
+      };
+
+      parsedList.push(payload);
+
+      localStorage.setItem('savedDesign', JSON.stringify(parsedList));
+    });
+  }
 
   return (
     <Container>
@@ -98,12 +200,15 @@ const Example = () => {
         <button onClick={togglePreview}>
           {preview ? 'Hide' : 'Show'} Preview
         </button>
+        <button onClick={quickSaveDesign}>Quick Save</button>
         <button onClick={saveDesign}>Save Design</button>
         <button onClick={exportHtml}>Export HTML</button>
+        <button onClick={exportFromLocalStorage}>From LocalStorage</button>
+        <button onClick={exportFromSample}>Export Sample</button>
       </Bar>
 
       <React.StrictMode>
-        <EmailEditor ref={emailEditorRef} onLoad={onLoad} onReady={onReady} />
+        <EmailEditor ref={emailEditorRef} onReady={onReady} />
       </React.StrictMode>
     </Container>
   );
